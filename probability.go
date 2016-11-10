@@ -38,10 +38,10 @@ import (
 */
 func (model Model) PredictProbability(x map[int]float64) (returnValue float64, probabilityEstimate []float64) {
 
-	if (model.param.SvmType == C_SVC || model.param.SvmType == NU_SVC) &&
-		model.probA != nil && model.probB != nil {
+	if (model.Param.SvmType == C_SVC || model.Param.SvmType == NU_SVC) &&
+		model.ProbA != nil && model.ProbB != nil {
 
-		var nrClass int = model.nrClass
+		var nrClass int = model.Nrclass
 		_, decisionValues := model.PredictValues(x)
 
 		var minProb float64 = 1e-7
@@ -54,7 +54,7 @@ func (model Model) PredictProbability(x map[int]float64) (returnValue float64, p
 		var k int = 0
 		for i := 0; i < nrClass; i++ {
 			for j := i + 1; j < nrClass; j++ {
-				m := maxf(sigmoidPredict(decisionValues[k], model.probA[k], model.probB[k]), minProb)
+				m := maxf(sigmoidPredict(decisionValues[k], model.ProbA[k], model.ProbB[k]), minProb)
 				pairWiseProb[i][j] = minf(m, 1-minProb)
 				pairWiseProb[j][i] = 1 - pairWiseProb[i][j]
 				k++
@@ -70,7 +70,7 @@ func (model Model) PredictProbability(x map[int]float64) (returnValue float64, p
 			}
 		}
 
-		returnValue = float64(model.label[maxIdx])
+		returnValue = float64(model.Label[maxIdx])
 		return // returnValue, probabilityEstimates
 	} else {
 		probabilityEstimate = nil
@@ -161,46 +161,46 @@ func multiClassProbability(k int, r [][]float64) []float64 {
  */
 func binarySvcProbability(prob *Problem, param *Parameter, Cp, Cn float64) (probA float64, probB float64) {
 	var nrFold int = 5
-	perm := make([]int, prob.l)
-	decisionValues := make([]float64, prob.l)
+	perm := make([]int, prob.L)
+	decisionValues := make([]float64, prob.L)
 
-	for i := 0; i < prob.l; i++ {
+	for i := 0; i < prob.L; i++ {
 		perm[i] = i
 	}
 
 	random := rand.New(rand.NewSource(time.Now().UTC().UnixNano()))
-	for i := 0; i < prob.l; i++ {
-		j := i + random.Intn(prob.l-i)
-		//j := i + randIntn(prob.l-i) // DEBUG
+	for i := 0; i < prob.L; i++ {
+		j := i + random.Intn(prob.L-i)
+		//j := i + randIntn(prob.L-i) // DEBUG
 		perm[i], perm[j] = perm[j], perm[i]
 	}
 
 	for i := 0; i < nrFold; i++ {
-		begin := i * prob.l / nrFold
-		end := (i + 1) * prob.l / nrFold
+		begin := i * prob.L / nrFold
+		end := (i + 1) * prob.L / nrFold
 
-		var subProb Problem
-		subProb.xSpace = prob.xSpace
-		subProb.l = prob.l - (end - begin)
-		subProb.x = make([]int, subProb.l)
-		subProb.y = make([]float64, subProb.l)
+		var subprob Problem
+		subprob.XSpace = prob.XSpace
+		subprob.L = prob.L - (end - begin)
+		subprob.X = make([]int, subprob.L)
+		subprob.Y = make([]float64, subprob.L)
 
 		var k int = 0
 		for j := 0; j < begin; j++ {
-			subProb.x[k] = prob.x[perm[j]]
-			subProb.y[k] = prob.y[perm[j]]
+			subprob.X[k] = prob.X[perm[j]]
+			subprob.Y[k] = prob.Y[perm[j]]
 			k++
 		}
-		for j := end; j < prob.l; j++ {
-			subProb.x[k] = prob.x[perm[j]]
-			subProb.y[k] = prob.y[perm[j]]
+		for j := end; j < prob.L; j++ {
+			subprob.X[k] = prob.X[perm[j]]
+			subprob.Y[k] = prob.Y[perm[j]]
 			k++
 		}
 
 		var pCount int = 0
 		var nCount int = 0
 		for j := 0; j < k; j++ {
-			if subProb.y[j] > 0 {
+			if subprob.Y[j] > 0 {
 				pCount++
 			} else {
 				nCount++
@@ -231,17 +231,17 @@ func binarySvcProbability(prob *Problem, param *Parameter, Cp, Cn float64) (prob
 			subParam.Weight[0] = Cp
 			subParam.Weight[1] = Cn
 			subModel := NewModel(&subParam)
-			subModel.Train(&subProb)
+			subModel.Train(&subprob)
 			for j := begin; j < end; j++ {
-				idx := prob.x[perm[j]]
-				x := SnodeToMap(prob.xSpace[idx:])
+				idx := prob.X[perm[j]]
+				x := SnodeToMap(prob.XSpace[idx:])
 				_, subProbDecision := subModel.PredictValues(x)
-				decisionValues[perm[j]] = subProbDecision[0] * float64(subModel.label[0])
+				decisionValues[perm[j]] = subProbDecision[0] * float64(subModel.Label[0])
 			}
 		}
 	}
 
-	probA, probB = sigmoidTrain(prob.l, decisionValues, prob.y)
+	probA, probB = sigmoidTrain(prob.L, decisionValues, prob.Y)
 	return // probA, probB
 }
 
@@ -378,24 +378,24 @@ func svrProbability(prob *Problem, param *Parameter) float64 {
 
 	ymv := CrossValidation(prob, &newParam, nrFold)
 
-	for i := 0; i < prob.l; i++ {
-		ymv[i] = prob.y[i] - ymv[i]
+	for i := 0; i < prob.L; i++ {
+		ymv[i] = prob.Y[i] - ymv[i]
 		mae += math.Abs(ymv[i])
 	}
 
-	mae /= float64(prob.l)
+	mae /= float64(prob.L)
 	std := math.Sqrt(2 * mae * mae)
 
 	var count int = 0
 	mae = 0
-	for i := 0; i < prob.l; i++ {
+	for i := 0; i < prob.L; i++ {
 		if math.Abs(ymv[i]) > 5*std {
 			count = count + 1
 		} else {
 			mae += math.Abs(ymv[i])
 		}
 	}
-	mae /= float64(prob.l - count)
+	mae /= float64(prob.L - count)
 	fmt.Printf("Prob. model for test data: target value = predicted value + z,\nz: Laplace distribution e^(-|z|/sigma)/(2sigma),sigma= %g\n", mae)
 
 	return mae

@@ -26,21 +26,21 @@ import (
 	"strings"
 )
 
-type snode struct {
-	index int     // dimension (-1 indicates end of SV)
-	value float64 // coeff
+type Snode struct {
+	Index int     // dimension (-1 indicates end of SV)
+	Value float64 // coeff
 }
 
 type Problem struct {
-	l      int       // #SVs
-	y      []float64 // labels
-	x      []int     // starting indices in xSpace defining SVs
-	xSpace []snode   // SV coeffs
-	i      int       // counter for iterator
+	L      int       // #SVs
+	Y      []float64 // labels
+	X      []int     // starting indices in xSpace defining SVs
+	XSpace []Snode   // SV coeffs
+	I      int       // counter for iterator
 }
 
 func NewProblem(file string, param *Parameter) (*Problem, error) {
-	prob := &Problem{l: 0, i: 0}
+	prob := &Problem{L: 0, I: 0}
 	err := prob.Read(file, param)
 	return prob, err
 }
@@ -53,9 +53,9 @@ func (problem *Problem) Read(file string, param *Parameter) error { // reads the
 
 	defer f.Close() // close f on method return
 
-	problem.y = nil
-	problem.x = nil
-	problem.xSpace = nil
+	problem.Y = nil
+	problem.X = nil
+	problem.XSpace = nil
 
 	reader := bufio.NewReader(f)
 	var max_idx int = 0
@@ -66,13 +66,13 @@ func (problem *Problem) Read(file string, param *Parameter) error { // reads the
 		if err != nil {
 			break
 		}
-		problem.x = append(problem.x, len(problem.xSpace))
+		problem.X = append(problem.X, len(problem.XSpace))
 
 		lineSansComments := strings.Split(line, "#") // remove any comments
 
 		tokens := strings.Fields(lineSansComments[0]) // get all the word tokens (seperated by white spaces)
 		if label, err := strconv.ParseFloat(tokens[0], 64); err == nil {
-			problem.y = append(problem.y, label)
+			problem.Y = append(problem.Y, label)
 		} else {
 			return fmt.Errorf("Fail to parse label\n")
 		}
@@ -90,7 +90,7 @@ func (problem *Problem) Read(file string, param *Parameter) error { // reads the
 					if value, err = strconv.ParseFloat(node[1], 64); err != nil {
 						return fmt.Errorf("Fail to parse value from token %v\n", w)
 					}
-					problem.xSpace = append(problem.xSpace, snode{index: index, value: value})
+					problem.XSpace = append(problem.XSpace, Snode{Index: index, Value: value})
 					if index > max_idx {
 						max_idx = index
 					}
@@ -99,10 +99,10 @@ func (problem *Problem) Read(file string, param *Parameter) error { // reads the
 			}
 		}
 
-		problem.xSpace = append(problem.xSpace, snode{index: -1})
+		problem.XSpace = append(problem.XSpace, Snode{Index: -1})
 		l++
 	}
-	problem.l = l
+	problem.L = l
 
 	if param.Gamma == 0 && max_idx > 0 {
 		param.Gamma = 1.0 / float64(max_idx)
@@ -115,14 +115,14 @@ func (problem *Problem) Read(file string, param *Parameter) error { // reads the
  * Initialize the start of iterating through the labels and vectors in the problem set
  */
 func (problem *Problem) Begin() {
-	problem.i = 0
+	problem.I = 0
 }
 
 /**
  * Finished iterating through all the labels and vectors in the problem set
  */
 func (problem *Problem) Done() bool {
-	if problem.i >= problem.l {
+	if problem.I >= problem.L {
 		return true
 	}
 	return false
@@ -132,7 +132,7 @@ func (problem *Problem) Done() bool {
  * Move to the next label and vector in the problem set
  */
 func (problem *Problem) Next() {
-	problem.i++
+	problem.I++
 	return
 }
 
@@ -142,9 +142,9 @@ func (problem *Problem) Next() {
  * @return x vector (map of dimension/value)
  */
 func (problem *Problem) GetLine() (y float64, x map[int]float64) {
-	y = problem.y[problem.i]
-	idx := problem.x[problem.i]
-	x = SnodeToMap(problem.xSpace[idx:])
+	y = problem.Y[problem.I]
+	idx := problem.X[problem.I]
+	x = SnodeToMap(problem.XSpace[idx:])
 	return // y, x
 }
 
@@ -153,5 +153,5 @@ func (problem *Problem) GetLine() (y float64, x map[int]float64) {
  * @return problem set size
  */
 func (problem *Problem) ProblemSize() int {
-	return problem.l
+	return problem.L
 }

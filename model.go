@@ -25,44 +25,44 @@ import (
 )
 
 type Model struct {
-	param     *Parameter
-	l         int
-	nrClass   int
-	label     []int
-	rho       []float64
-	nSV       []int
-	sV        []int
-	svSpace   []snode
-	svIndices []int
-	svCoef    [][]float64
-	probA     []float64
-	probB     []float64
+	Param     *Parameter
+	L         int
+	Nrclass   int
+	Label     []int
+	Rho       []float64
+	NSV       []int
+	SV        []int
+	SvSpace   []Snode
+	SvIndices []int
+	SvCoef    [][]float64
+	ProbA     []float64
+	ProbB     []float64
 }
 
 func NewModel(param *Parameter) *Model {
-	return &Model{param: param}
+	return &Model{Param: param}
 }
 
 func NewModelFromFile(file string) *Model {
 	param := NewParameter()
 	model := NewModel(param)
-	model.ReadModel(file)	
+	model.ReadModel(file)
 	return model
 }
 
 func (model Model) NrClass() int {
-	return model.nrClass
+	return model.Nrclass
 }
 
 func groupClasses(prob *Problem) (nrClass int, label []int, start []int, count []int, perm []int) {
-	var l int = prob.l
+	var l int = prob.L
 
 	label = make([]int, 0)
 	count = make([]int, 0)
 	data_label := make([]int, l)
 
 	for i := 0; i < l; i++ { // find unqie labels and put them in the label slice
-		this_label := int(prob.y[i])
+		this_label := int(prob.Y[i])
 		var j int
 		for j = 0; j < len(label); j++ {
 			if this_label == label[j] {
@@ -119,27 +119,27 @@ func (model *Model) classification(prob *Problem) {
 
 	nrClass, label, start, count, perm := groupClasses(prob) // group SV with the same labels together
 
-	var l int = prob.l
+	var l int = prob.L
 	x := make([]int, l)
 	for i := 0; i < l; i++ {
-		x[i] = prob.x[perm[i]] // this is the new x slice with the grouped SVs
+		x[i] = prob.X[perm[i]] // this is the new x slice with the grouped SVs
 	}
 
 	weighted_C := make([]float64, nrClass)
 	for i := 0; i < nrClass; i++ {
-		weighted_C[i] = model.param.C
+		weighted_C[i] = model.Param.C
 	}
-	for i := 0; i < model.param.NrWeight; i++ { // this is only done if the relative weight of the labels have been set by the user
+	for i := 0; i < model.Param.NrWeight; i++ { // this is only done if the relative weight of the labels have been set by the user
 		var j int = 0
 		for j = 0; j < nrClass; j++ {
-			if model.param.WeightLabel[i] == label[j] {
+			if model.Param.WeightLabel[i] == label[j] {
 				break
 			}
 		}
 		if j == nrClass {
-			fmt.Fprintf(os.Stderr, "WARNING: class label %d specified in weight is not found\n", model.param.WeightLabel[i])
+			fmt.Fprintf(os.Stderr, "WARNING: class label %d specified in weight is not found\n", model.Param.WeightLabel[i])
 		} else {
-			weighted_C[j] = weighted_C[j] * model.param.Weight[i] // multiple with user specified weight for label
+			weighted_C[j] = weighted_C[j] * model.Param.Weight[i] // multiple with user specified weight for label
 		}
 	}
 
@@ -151,7 +151,7 @@ func (model *Model) classification(prob *Problem) {
 	totalCompares := nrClass * (nrClass - 1) / 2
 	decisions := make([]decision, totalCompares) // slice for appending all our decisions.
 	var probA, probB []float64
-	if model.param.Probability {
+	if model.Param.Probability {
 		probA = make([]float64, totalCompares)
 		probB = make([]float64, totalCompares)
 	}
@@ -159,7 +159,7 @@ func (model *Model) classification(prob *Problem) {
 	var p int = 0
 	for i := 0; i < nrClass; i++ {
 		for j := i + 1; j < nrClass; j++ {
-			var subProb Problem
+			var subprob Problem
 
 			si := start[i] // SV starting from x[si] are related to label i
 			sj := start[j] // SV starting from x[sj] are related to label j
@@ -167,25 +167,25 @@ func (model *Model) classification(prob *Problem) {
 			ci := count[i] // number of SV from x[si] that are related to label i
 			cj := count[j] // number of SV from x[sj] that are related to label j
 
-			subProb.xSpace = prob.xSpace // inherits the space
-			subProb.l = ci + cj          // focus only on 2 labels
-			subProb.x = make([]int, subProb.l)
-			subProb.y = make([]float64, subProb.l)
+			subprob.XSpace = prob.XSpace // inherits the space
+			subprob.L = ci + cj          // focus only on 2 labels
+			subprob.X = make([]int, subprob.L)
+			subprob.Y = make([]float64, subprob.L)
 			for k := 0; k < ci; k++ {
-				subProb.x[k] = x[si+k] // starting indices for first label
-				subProb.y[k] = 1
+				subprob.X[k] = x[si+k] // starting indices for first label
+				subprob.Y[k] = 1
 			}
 
 			for k := 0; k < cj; k++ {
-				subProb.x[ci+k] = x[sj+k] // starting indices for second label
-				subProb.y[ci+k] = -1
+				subprob.X[ci+k] = x[sj+k] // starting indices for second label
+				subprob.Y[ci+k] = -1
 			}
 
-			if model.param.Probability {
-				probA[p], probB[p] = binarySvcProbability(&subProb, model.param, weighted_C[i], weighted_C[j])
+			if model.Param.Probability {
+				probA[p], probB[p] = binarySvcProbability(&subprob, model.Param, weighted_C[i], weighted_C[j])
 			}
 
-			if decision_result, err := train_one(&subProb, model.param, weighted_C[i], weighted_C[j]); err == nil { // no error in training
+			if decision_result, err := train_one(&subprob, model.Param, weighted_C[i], weighted_C[j]); err == nil { // no error in training
 
 				decisions[p] = decision_result
 
@@ -210,25 +210,25 @@ func (model *Model) classification(prob *Problem) {
 	}
 
 	// Update the model!
-	model.nrClass = nrClass
-	model.label = make([]int, nrClass)
+	model.Nrclass = nrClass
+	model.Label = make([]int, nrClass)
 	for i := 0; i < nrClass; i++ {
-		model.label[i] = label[i]
+		model.Label[i] = label[i]
 	}
 
-	model.rho = make([]float64, len(decisions))
+	model.Rho = make([]float64, len(decisions))
 	for i := 0; i < len(decisions); i++ {
-		model.rho[i] = decisions[i].rho
+		model.Rho[i] = decisions[i].rho
 	}
 
-	if model.param.Probability {
-		model.probA = probA
-		model.probB = probB
+	if model.Param.Probability {
+		model.ProbA = probA
+		model.ProbB = probB
 	}
 
 	var totalSV int = 0
 	nz_count := make([]int, nrClass)
-	model.nSV = make([]int, nrClass)
+	model.NSV = make([]int, nrClass)
 	for i := 0; i < nrClass; i++ {
 		var nSV int = 0
 		for j := 0; j < count[i]; j++ {
@@ -237,25 +237,25 @@ func (model *Model) classification(prob *Problem) {
 				totalSV++
 			}
 		}
-		model.nSV[i] = nSV
+		model.NSV[i] = nSV
 		nz_count[i] = nSV
 	}
 
-	if !model.param.QuietMode {
+	if !model.Param.QuietMode {
 		fmt.Printf("Total nSV = %d\n", totalSV)
 	}
 
-	model.l = totalSV
-	model.svSpace = prob.xSpace
+	model.L = totalSV
+	model.SvSpace = prob.XSpace
 
-	model.sV = make([]int, totalSV)
-	model.svIndices = make([]int, totalSV)
+	model.SV = make([]int, totalSV)
+	model.SvIndices = make([]int, totalSV)
 
 	p = 0
 	for i := 0; i < l; i++ {
 		if nonzero[i] {
-			model.sV[p] = x[i]
-			model.svIndices[p] = perm[i] + 1
+			model.SV[p] = x[i]
+			model.SvIndices[p] = perm[i] + 1
 			p++
 		}
 	}
@@ -266,9 +266,9 @@ func (model *Model) classification(prob *Problem) {
 		nzStart[i] = nzStart[i-1] + nz_count[i-1]
 	}
 
-	model.svCoef = make([][]float64, nrClass-1)
+	model.SvCoef = make([][]float64, nrClass-1)
 	for i := 0; i < nrClass-1; i++ {
-		model.svCoef[i] = make([]float64, totalSV)
+		model.SvCoef[i] = make([]float64, totalSV)
 	}
 
 	p = 0
@@ -288,14 +288,14 @@ func (model *Model) classification(prob *Problem) {
 			q := nzStart[i]
 			for k := 0; k < ci; k++ {
 				if nonzero[si+k] {
-					model.svCoef[j-1][q] = decisions[p].alpha[k]
+					model.SvCoef[j-1][q] = decisions[p].alpha[k]
 					q++
 				}
 			}
 			q = nzStart[j]
 			for k := 0; k < cj; k++ {
 				if nonzero[sj+k] {
-					model.svCoef[i][q] = decisions[p].alpha[ci+k]
+					model.SvCoef[i][q] = decisions[p].alpha[ci+k]
 					q++
 				}
 			}
@@ -307,37 +307,37 @@ func (model *Model) classification(prob *Problem) {
 
 func (model *Model) regressionOneClass(prob *Problem) {
 
-	model.nrClass = 2
+	model.Nrclass = 2
 
-	if model.param.Probability &&
-		(model.param.SvmType == EPSILON_SVR || model.param.SvmType == NU_SVR) {
-		model.probA = make([]float64, 1)
-		model.probA[0] = svrProbability(prob, model.param)
+	if model.Param.Probability &&
+		(model.Param.SvmType == EPSILON_SVR || model.Param.SvmType == NU_SVR) {
+		model.ProbA = make([]float64, 1)
+		model.ProbA[0] = svrProbability(prob, model.Param)
 	}
 
-	if decision_result, err := train_one(prob, model.param, 0, 0); err == nil { // no error in training
-		model.rho = append(model.rho, decision_result.rho)
+	if decision_result, err := train_one(prob, model.Param, 0, 0); err == nil { // no error in training
+		model.Rho = append(model.Rho, decision_result.rho)
 
 		var nSV int = 0
-		for i := 0; i < prob.l; i++ {
+		for i := 0; i < prob.L; i++ {
 			if math.Abs(decision_result.alpha[i]) > 0 {
 				nSV++
 			}
 		}
 
-		model.l = nSV
-		model.svSpace = prob.xSpace
-		model.sV = make([]int, nSV)
-		model.svCoef = make([][]float64, 1)
-		model.svCoef[0] = make([]float64, nSV)
-		model.svIndices = make([]int, nSV)
+		model.L = nSV
+		model.SvSpace = prob.XSpace
+		model.SV = make([]int, nSV)
+		model.SvCoef = make([][]float64, 1)
+		model.SvCoef[0] = make([]float64, nSV)
+		model.SvIndices = make([]int, nSV)
 
 		var j int = 0
-		for i := 0; i < prob.l; i++ {
+		for i := 0; i < prob.L; i++ {
 			if math.Abs(decision_result.alpha[i]) > 0 {
-				model.sV[j] = prob.x[i]
-				model.svCoef[0][j] = decision_result.alpha[i]
-				model.svIndices[j] = i + 1
+				model.SV[j] = prob.X[i]
+				model.SvCoef[0][j] = decision_result.alpha[i]
+				model.SvIndices[j] = i + 1
 				j++
 			}
 		}
@@ -347,7 +347,7 @@ func (model *Model) regressionOneClass(prob *Problem) {
 }
 
 func (model *Model) Train(prob *Problem) error {
-	switch model.param.SvmType {
+	switch model.Param.SvmType {
 	case C_SVC, NU_SVC:
 		model.classification(prob)
 	case ONE_CLASS, EPSILON_SVR, NU_SVR:
@@ -355,4 +355,3 @@ func (model *Model) Train(prob *Problem) error {
 	}
 	return nil
 }
-

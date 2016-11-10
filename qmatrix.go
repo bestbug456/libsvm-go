@@ -84,12 +84,12 @@ func newSVCQ(prob *Problem, param *Parameter, y []int8) *svcQ {
 		panic(err)
 	}
 
-	qd := make([]float64, prob.l)
-	for i := 0; i < prob.l; i++ {
+	qd := make([]float64, prob.L)
+	for i := 0; i < prob.L; i++ {
 		qd[i] = kernel.compute(i, i)
 	}
 
-	return &svcQ{y: y, qd: qd, kernel: kernel, parRunner: newParallelRunner(prob.l, param.NumCPU), colCache: newCache(prob.l, prob.l, param.CacheSize)}
+	return &svcQ{y: y, qd: qd, kernel: kernel, parRunner: newParallelRunner(prob.L, param.NumCPU), colCache: newCache(prob.L, prob.L, param.CacheSize)}
 }
 
 /**
@@ -149,12 +149,12 @@ func newOneClassQ(prob *Problem, param *Parameter) *oneClassQ {
 		panic(err)
 	}
 
-	qd := make([]float64, prob.l)
-	for i := 0; i < prob.l; i++ {
+	qd := make([]float64, prob.L)
+	for i := 0; i < prob.L; i++ {
 		qd[i] = kernel.compute(i, i)
 	}
 
-	return &oneClassQ{qd: qd, kernel: kernel, parRunner: newParallelRunner(prob.l, param.NumCPU), colCache: newCache(prob.l, prob.l, param.CacheSize)}
+	return &oneClassQ{qd: qd, kernel: kernel, parRunner: newParallelRunner(prob.L, param.NumCPU), colCache: newCache(prob.L, prob.L, param.CacheSize)}
 }
 
 /**
@@ -238,12 +238,12 @@ func newSVRQ(prob *Problem, param *Parameter) *svrQ {
 		panic(err)
 	}
 
-	l := prob.l
+	l := prob.L
 	qd := make([]float64, 2*l)
 	for i := 0; i < l; i++ {
 		qd[i] = kernel.compute(i, i)
 		qd[i+l] = qd[i]
 	}
 
-	return &svrQ{l: l, qd: qd, kernel: kernel, parRunner: newParallelRunner(prob.l, param.NumCPU), colCache: newCache(prob.l, 2*prob.l, param.CacheSize)}
+	return &svrQ{l: l, qd: qd, kernel: kernel, parRunner: newParallelRunner(prob.L, param.NumCPU), colCache: newCache(prob.L, 2*prob.L, param.CacheSize)}
 }

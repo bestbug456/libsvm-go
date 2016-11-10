@@ -32,7 +32,7 @@ import (
    stored in the slice called target.
 */
 func CrossValidation(prob *Problem, param *Parameter, nrFold int) (target []float64) {
-	var l int = prob.l
+	var l int = prob.L
 
 	target = make([]float64, l) // slice to return
 
@@ -113,39 +113,39 @@ func CrossValidation(prob *Problem, param *Parameter, nrFold int) (target []floa
 		begin := foldStart[i]
 		end := foldStart[i+1]
 
-		var subProb Problem
+		var subprob Problem
 
-		subProb.xSpace = prob.xSpace // inherit problem space
-		subProb.l = l - (end - begin)
-		subProb.x = make([]int, subProb.l)
-		subProb.y = make([]float64, subProb.l)
+		subprob.XSpace = prob.XSpace // inherit problem space
+		subprob.L = l - (end - begin)
+		subprob.X = make([]int, subprob.L)
+		subprob.Y = make([]float64, subprob.L)
 
 		var k int = 0
 		for j := 0; j < begin; j++ {
-			subProb.x[k] = prob.x[perm[j]]
-			subProb.y[k] = prob.y[perm[j]]
+			subprob.X[k] = prob.X[perm[j]]
+			subprob.Y[k] = prob.Y[perm[j]]
 			k++
 		}
 		for j := end; j < l; j++ {
-			subProb.x[k] = prob.x[perm[j]]
-			subProb.y[k] = prob.y[perm[j]]
+			subprob.X[k] = prob.X[perm[j]]
+			subprob.Y[k] = prob.Y[perm[j]]
 			k++
 		}
 
 		subModel := NewModel(param)
-		subModel.Train(&subProb)
+		subModel.Train(&subprob)
 
 		if param.Probability &&
 			(param.SvmType == C_SVC || param.SvmType == NU_SVC) {
 			for j := begin; j < end; j++ {
-				idx := prob.x[perm[j]]
-				x := SnodeToMap(prob.xSpace[idx:])
+				idx := prob.X[perm[j]]
+				x := SnodeToMap(prob.XSpace[idx:])
 				target[perm[j]], _ = subModel.PredictProbability(x)
 			}
 		} else {
 			for j := begin; j < end; j++ {
-				idx := prob.x[perm[j]]
-				x := SnodeToMap(prob.xSpace[idx:])
+				idx := prob.X[perm[j]]
+				x := SnodeToMap(prob.XSpace[idx:])
 				target[perm[j]] = subModel.Predict(x)
 			}
 		}
